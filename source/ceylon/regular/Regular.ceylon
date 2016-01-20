@@ -1,7 +1,7 @@
 import ceylon.collection { HashSet }
 
 "Result of a string match"
-shared interface MatchResult of Res {
+shared interface MatchResult {
     shared formal Integer length;
     shared formal String matched;
 }
@@ -11,6 +11,11 @@ class Res(shared actual String matched,
         shared actual Integer length)
         satisfies MatchResult {
     shared default Res? backtrack = null;
+}
+
+Res res(MatchResult result) {
+    assert (is Res result);
+    return result;
 }
 
 "A regular language for string matching."
@@ -125,10 +130,9 @@ class Concat(Regular a, Regular b) extends Regular() {
                 else null;
             value next = b.matchAt(pos + a.length, s, nextLength);
 
-            if (exists n = next) { return CRes(pos, s, maxLength, a of Res, n
-                    of Res); }
+            if (exists n = next) { return CRes(pos, s, maxLength, res(a), res(n)); }
 
-            aRes = (a of Res).backtrack;
+            aRes = res(a).backtrack;
         }
 
         return null;
@@ -173,7 +177,7 @@ class Repeat(Regular r, Integer min, Integer? max)
                     maxLength);
 
             if (exists next) {
-                return RRes(newPos, s, count + 1, this, next of Res).advance(maxLength);
+                return RRes(newPos, s, count + 1, this, res(next)).advance(maxLength);
             }
 
             return count >= outer.min then this;
@@ -228,8 +232,7 @@ class Disjoin(Regular a, Regular b) extends Regular() {
         value aRes = a.matchAt(position, s, maxLength);
         value bRes = b.matchAt(position, s, maxLength);
 
-        if (exists aRes, exists bRes) { return DRes(aRes of Res, bRes of
-                Res); }
+        if (exists aRes, exists bRes) { return DRes(res(aRes), res(bRes)); }
 
         return aRes else bRes;
     }
