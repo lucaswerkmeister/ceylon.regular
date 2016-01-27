@@ -1,5 +1,5 @@
-import ceylon.regular { any, lit, not }
-import ceylon.test { test }
+import ceylon.regular { any, lit, not, where }
+import ceylon.test { test, assertEquals }
 
 test
 shared void backtrack() {
@@ -53,4 +53,16 @@ shared void repeatTest() {
     assert(exp.match("aaaa") exists);
     assert(exp.match("aaaaa") exists);
     assert(exists k = exp.match("aaaaaa"), k.matched == "aaaaa");
+}
+
+test
+shared void whereTest() {
+    assertEquals {
+        expected = lit("c").match("c");
+        actual = where('c'.equals).match("c");
+    };
+    assertEquals {
+        expected = lit("c").match("c");
+        actual = where(and(Character.lowercase, Character.letter)).match("c");
+    };
 }
