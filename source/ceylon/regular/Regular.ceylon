@@ -86,6 +86,16 @@ class Literal(String val) extends Regular() {
     }
 }
 
+"Regular language that matches a single character according to a predicate function."
+class Where(Boolean predicate(Character character)) extends Regular() {
+    shared actual MatchResult? matchAt(Integer position,
+            String s, Integer? maxLength) {
+        if (exists maxLength, maxLength < 1) { return null; }
+        if (exists c = s[position], predicate(c)) { return Res(c.string, 1); }
+        return null;
+    }
+}
+
 "Regular language that matches another language, but always returns a
  zero-length match result. If [[invert]] is set, we return zero when [[r]]
  doesn't match, and `null` when it does."
@@ -247,6 +257,9 @@ shared Regular lit(String c)
  match. The resulting match is always zero-length."
 shared Regular not(Regular r)
     => Lookahead(r, true);
+
+shared Regular where(Boolean predicate(Character character))
+    => Where(predicate);
 
 shared object anyChar extends Regular() {
     shared actual MatchResult? matchAt(Integer position, String s,
