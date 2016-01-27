@@ -11,6 +11,15 @@ class Res(shared actual String matched,
         shared actual Integer length)
         satisfies MatchResult {
     shared default Res? backtrack = null;
+    shared actual String string => matched;
+    shared actual Boolean equals(Object that) {
+        if (is MatchResult that) {
+            return this.matched == that.matched;
+        } else {
+            return false;
+        }
+    }
+    shared actual Integer hash => 31 * matched.hash;
 }
 
 "A regular language for string matching."
