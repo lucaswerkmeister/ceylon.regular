@@ -119,8 +119,16 @@ class Lookahead(Lazy<Regular> r, Boolean invert) extends Regular() {
         => if (r_.matchAt(position, s) exists) then !invert else invert;
 
     shared actual MatchResult? matchAt(Integer position, String s,
-            Integer? maxLength)
-        => if (subMatchAt(position, s)) then Res("", 0) else null;
+            Integer? maxLength) {
+        if (position >= s.size) {
+            // match must be zero-length, require non-lazy regular
+            print("foo");
+            if (!r is Regular) {
+                return null;
+            }
+        }
+        return if (subMatchAt(position, s)) then Res("", 0) else null;
+    }
 }
 
 "Regular language that concatenates two other languages"
@@ -143,8 +151,16 @@ class Concat(Lazy<Regular> a, Lazy<Regular> b) extends Regular() {
     }
 
     shared actual MatchResult? matchAt(Integer position,
-            String s, Integer? maxLength)
-            => resultB(position, s, maxLength, a_.matchAt(position, s, maxLength));
+            String s, Integer? maxLength) {
+        if (position >= s.size) {
+            // match must be zero-length, require non-lazy regulars
+            print("foo");
+            if (!a is Regular || !b is Regular) {
+                return null;
+            }
+        }
+        return resultB(position, s, maxLength, a_.matchAt(position, s, maxLength));
+    }
 
     "Get the second part of the match result"
     Res? resultB(Integer pos, String s, Integer? maxLength,
@@ -212,8 +228,16 @@ class Repeat(Lazy<Regular> r, Integer min, Integer? max)
     }
 
     shared actual MatchResult? matchAt(Integer position, String s,
-            Integer? maxLength)
-            => RRes(position, s, 0, null, null).advance(maxLength);
+            Integer? maxLength) {
+        if (position >= s.size) {
+            // match must be zero-length, require non-lazy regular
+            print("foo");
+            if (!r is Regular) {
+                return null;
+            }
+        }
+        return RRes(position, s, 0, null, null).advance(maxLength);
+    }
 }
 
 "Regular language that matches either of two other languages"
@@ -258,15 +282,53 @@ class Disjoin(Lazy<Regular> a, Lazy<Regular> b) extends Regular() {
             return aBack else bBack;
         }
     }
+    
+    "Special result for lazy disjoins"
+    class DResLazy(Res aRes, Res?() bResLazy) extends Res(aRes.matched, aRes.length) {
+        shared actual Res? backtrack {
+            if (exists back = aRes.backtrack) {
+                return DResLazy(back, bResLazy);
+            } else {
+                Res? bRes = bResLazy();
+                if (exists bRes) {
+                    return DRes(aRes, bRes);
+                } else {
+                    return null;
+                }
+            }
+        }
+    }
 
     shared actual MatchResult? matchAt(Integer position, String s, Integer? maxLength) {
-        value aRes = a_.matchAt(position, s, maxLength);
-        value bRes = b_.matchAt(position, s, maxLength);
-
-        if (exists aRes, exists bRes) { return DRes(aRes of Res, bRes of
-                Res); }
-
-        return aRes else bRes;
+        if (position >= s.size) {
+            // match must be zero-length, require non-lazy regulars
+            print("foo");
+            if (is Regular a, is Regular b) {
+                value aRes = a.matchAt(position, s, maxLength);
+                value bRes = b.matchAt(position, s, maxLength);
+                if (exists aRes, exists bRes) {
+                    return DRes(aRes of Res, bRes of Res);
+                } else {
+                    return aRes else bRes;
+                }
+            } else {
+                return null;
+            }
+        } else {
+            if (exists aRes = a_.matchAt(position, s, maxLength)) {
+                variable Res result = DResLazy(aRes of Res, () => b_.matchAt(position, s, maxLength) of Res?);
+                variable Res longestResult = result;
+                while (exists back = result.backtrack) {
+                    result = back;
+                    if (result.length > longestResult.length) {
+                        longestResult = result;
+                    }
+                }
+                return longestResult;
+            } else {
+                return b_.matchAt(position, s, maxLength);
+            }
+        }
     }
 }
 
