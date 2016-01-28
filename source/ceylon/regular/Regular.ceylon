@@ -1,5 +1,7 @@
 import ceylon.collection { HashSet }
 
+shared alias Lazy<T> => T|T();
+
 "Result of a string match"
 shared interface MatchResult of Res {
     shared formal Integer length;
@@ -60,15 +62,17 @@ shared abstract class Regular() satisfies Summable<Regular> {
 
     "Concatenate this and another regular language."
     shared actual Regular plus(Regular r) => Concat(this, r);
+    "Concatenate this and another regular language."
+    shared Regular concat(Lazy<Regular> r) => Concat(this, r);
 
     "Get a new regular language that matches only the overlap of this and
      [[r]], that is, use this language as lookahead, and if successful, match
      [[r]]."
-    shared Regular and(Regular r) => Concat(Lookahead(this, false), r);
+    shared Regular and(Lazy<Regular> r) => Concat(Lookahead(this, false), r);
 
     "Get a new regular language that matches this language or the language
      [[r]]."
-    shared Regular or(Regular r) => Disjoin(this, r);
+    shared Regular or(Lazy<Regular> r) => Disjoin(this, r);
 }
 
 "Regular language that matches any of a set of characters"
@@ -108,9 +112,11 @@ class Where(Boolean predicate(Character character)) extends Regular() {
 "Regular language that matches another language, but always returns a
  zero-length match result. If [[invert]] is set, we return zero when [[r]]
  doesn't match, and `null` when it does."
-class Lookahead(Regular r, Boolean invert) extends Regular() {
+class Lookahead(Lazy<Regular> r, Boolean invert) extends Regular() {
+    variable Regular? the_r = null;
+    Regular r_ => if (exists the_r_ = the_r) then the_r_ else (the_r = if (is Regular r) then r else r());
     Boolean subMatchAt(Integer position, String s)
-        => if (r.matchAt(position, s) exists) then !invert else invert;
+        => if (r_.matchAt(position, s) exists) then !invert else invert;
 
     shared actual MatchResult? matchAt(Integer position, String s,
             Integer? maxLength)
@@ -118,7 +124,11 @@ class Lookahead(Regular r, Boolean invert) extends Regular() {
 }
 
 "Regular language that concatenates two other languages"
-class Concat(Regular a, Regular b) extends Regular() {
+class Concat(Lazy<Regular> a, Lazy<Regular> b) extends Regular() {
+    variable Regular? the_a = null;
+    Regular a_ => if (exists the_a_ = the_a) then the_a_ else (the_a = if (is Regular a) then a else a());
+    variable Regular? the_b = null;
+    Regular b_ => if (exists the_b_ = the_b) then the_b_ else (the_b = if (is Regular b) then b else b());
     "Match result with appropriate backtracking"
     class CRes(Integer pos, String s, Integer? maxLength, Res aRes, Res bRes)
             extends Res(aRes.matched + bRes.matched,
@@ -134,7 +144,7 @@ class Concat(Regular a, Regular b) extends Regular() {
 
     shared actual MatchResult? matchAt(Integer position,
             String s, Integer? maxLength)
-            => resultB(position, s, maxLength, a.matchAt(position, s, maxLength));
+            => resultB(position, s, maxLength, a_.matchAt(position, s, maxLength));
 
     "Get the second part of the match result"
     Res? resultB(Integer pos, String s, Integer? maxLength,
@@ -142,7 +152,7 @@ class Concat(Regular a, Regular b) extends Regular() {
         while (exists a = aRes) {
             value nextLength = if (exists maxLength) then maxLength - a.length
                 else null;
-            value next = b.matchAt(pos + a.length, s, nextLength);
+            value next = b_.matchAt(pos + a.length, s, nextLength);
 
             if (exists n = next) { return CRes(pos, s, maxLength, a of Res, n
                     of Res); }
@@ -155,8 +165,10 @@ class Concat(Regular a, Regular b) extends Regular() {
 }
 
 "Regular language that repeats a given language several times."
-class Repeat(Regular r, Integer min, Integer? max)
+class Repeat(Lazy<Regular> r, Integer min, Integer? max)
         extends Regular() {
+    variable Regular? the_r = null;
+    Regular r_ => if (exists the_r_ = the_r) then the_r_ else (the_r = if (is Regular r) then r else r());
     "Local match result"
     class RRes(Integer pos, String s, Integer count, RRes? prev, Res? cur)
         extends Res((prev?.matched else "") + (cur?.matched else ""),
@@ -188,7 +200,7 @@ class Repeat(Regular r, Integer min, Integer? max)
             if (exists c = cur?.length, c == 0) { return this; }
 
             value newPos = pos + (cur?.length else 0);
-            value next = outer.r.matchAt(newPos, s,
+            value next = outer.r_.matchAt(newPos, s,
                     maxLength);
 
             if (exists next) {
@@ -205,7 +217,11 @@ class Repeat(Regular r, Integer min, Integer? max)
 }
 
 "Regular language that matches either of two other languages"
-class Disjoin(Regular a, Regular b) extends Regular() {
+class Disjoin(Lazy<Regular> a, Lazy<Regular> b) extends Regular() {
+    variable Regular? the_a = null;
+    Regular a_ => if (exists the_a_ = the_a) then the_a_ else (the_a = if (is Regular a) then a else a());
+    variable Regular? the_b = null;
+    Regular b_ => if (exists the_b_ = the_b) then the_b_ else (the_b = if (is Regular b) then b else b());
 
     "Special result for disjoins"
     class DRes(Res aRes, Res bRes)
@@ -244,8 +260,8 @@ class Disjoin(Regular a, Regular b) extends Regular() {
     }
 
     shared actual MatchResult? matchAt(Integer position, String s, Integer? maxLength) {
-        value aRes = a.matchAt(position, s, maxLength);
-        value bRes = b.matchAt(position, s, maxLength);
+        value aRes = a_.matchAt(position, s, maxLength);
+        value bRes = b_.matchAt(position, s, maxLength);
 
         if (exists aRes, exists bRes) { return DRes(aRes of Res, bRes of
                 Res); }
@@ -264,11 +280,18 @@ shared Regular lit(String c)
 
 "Get a regular language that matches only when the given language does not
  match. The resulting match is always zero-length."
-shared Regular not(Regular r)
+shared Regular not(Lazy<Regular> r)
     => Lookahead(r, true);
 
 shared Regular where(Boolean predicate(Character character))
     => Where(predicate);
+
+shared Regular lazy(Lazy<Regular> r)
+    => object extends Regular() {
+        variable Regular? the_r = null;
+        Regular r_ => if (exists the_r_ = the_r) then the_r_ else (the_r = if (is Regular r) then r else r());
+        shared actual MatchResult? matchAt(Integer position, String s, Integer? maxLength) => r_.matchAt(position, s, maxLength);
+    };
 
 shared object anyChar extends Regular() {
     shared actual MatchResult? matchAt(Integer position, String s,
