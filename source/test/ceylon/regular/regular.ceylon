@@ -1,5 +1,5 @@
-import ceylon.regular { any, lit, not }
-import ceylon.test { test }
+import ceylon.regular { Regular, any, lazy, lit, where }
+import ceylon.test { test, assertEquals, ignore }
 
 test
 shared void backtrack() {
@@ -53,4 +53,36 @@ shared void repeatTest() {
     assert(exp.match("aaaa") exists);
     assert(exp.match("aaaaa") exists);
     assert(exists k = exp.match("aaaaaa"), k.matched == "aaaaa");
+}
+
+test
+shared void whereTest() {
+    assertEquals {
+        expected = lit("c").match("c");
+        actual = where('c'.equals).match("c");
+    };
+    assertEquals {
+        expected = lit("c").match("c");
+        actual = where(and(Character.lowercase, Character.letter)).match("c");
+    };
+}
+
+test
+ignore ("unsupported")
+shared void circularTestLeftRecursive() {
+    Regular commaSeparatedXs() => lit("a").or(lazy(commaSeparatedXs).concat(lit(",a")));
+    assert(exists m = commaSeparatedXs().match("a,a,a"), m.matched == "a,a,a");
+}
+
+test
+shared void circularTestRightRecursive() {
+    Regular commaSeparatedXs() => lit("a").or(lit("a,").concat(lazy(commaSeparatedXs)));
+    assert(exists m = commaSeparatedXs().match("a,a,a"), m.matched == "a,a,a");
+}
+
+test
+shared void circularTestParentheses() {
+    Regular parentheses() => lit("(").concat(lazy(parentheses).zeroPlus).concat(lit(")"));
+    String parens = "((()(())())()(((())())((()))())())";
+    assert(exists m = parentheses().match(parens), m.matched == parens);
 }
